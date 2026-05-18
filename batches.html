@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Batch Details – Next Topper</title>
+
+  <!-- Tailwind + Google Font -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- zstd decoder -->
+  <script src="https://cdn.jsdelivr.net/npm/zstddec@0.1.0/dist/zstddec.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .description img {
+      max-width: 100%; height: auto; max-height: 280px;
+      object-fit: contain; border-radius: 12px; display: block; margin: 12px auto;
+    }
+    .tab-btn.active { background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; }
+
+    .folder-content { display: none; margin-top: 12px; padding-left: 16px; border-left: 2px solid #6366f1; }
+    .folder-content.open { display: block; animation: slideDown 0.3s ease; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .file-card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      overflow: hidden;
+      word-break: break-word;
+      align-items: center;
+    }
+    .file-card:hover { background: rgba(99,102,241,0.1); transform: translateY(-1px); }
+
+    .file-card .thumb {
+      width: 80px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 10px;
+      flex-shrink: 0;
+      background: #1e293b;
+    }
+
+    .file-card .info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .file-card .title {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #fff;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .file-card .meta {
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 400;
+    }
+
+    @media (max-width: 480px) {
+      .file-card {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .file-card .thumb {
+        width: 100%;
+        height: 140px;
+        margin-bottom: 8px;
+      }
+    }
+
+    .folder-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      cursor: pointer;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.05);
+      transition: 0.2s;
+      overflow: hidden;
+    }
+    .folder-header:hover { background: rgba(99,102,241,0.1); }
+    .folder-icon { width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
+    .folder-title {
+      font-weight: 600;
+      font-size: 14px;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .expand-arrow { font-size: 16px; color: #9ca3af; }
+
+    /* Media overlay */
+    #media-loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      backdrop-filter: blur(8px);
+    }
+    #media-loading-overlay.hidden { display: none; }
+    .loading-card {
+      background: #1e293b;
+      border-radius: 24px;
+      padding: 32px;
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: white;
+    }
+    .loading-card .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(255,255,255,0.2);
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-card p { margin: 0 0 16px; }
+    .loading-card .btn {
+      background: #6366f1;
+      border: none;
+      color: white;
+      padding: 10px 24px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      margin: 4px;
+    }
+    .loading-card .btn-danger { background: #ef4444; }
+  </style>
+</head>
+<body class="bg-zinc-900 text-white min-h-screen transition-colors antialiased">
+
+  <!-- Page loader -->
+  <div id="loader" class="fixed inset-0 bg-zinc-900 flex flex-col items-center justify-center z-50 transition-opacity">
+    <div class="w-16 h-16 rounded-full border-4 border-zinc-700 border-t-indigo-500 animate-spin mb-4"></div>
+    <p class="text-zinc-400 text-sm tracking-wide">Initializing System...</p>
+  </div>
+
+  <!-- Media loading overlay -->
+  <div id="media-loading-overlay" class="hidden">
+    <div class="loading-card">
+      <div class="spinner" id="media-spinner"></div>
+      <p id="media-status-text" class="text-lg font-semibold">Getting Your Media Ready...</p>
+      <div id="media-error-container" class="hidden">
+        <p id="media-error-text" class="text-sm text-red-400"></p>
+        <button class="btn" id="media-retry-btn">Retry</button>
+      </div>
+      <button id="media-close-btn" class="btn btn-danger hidden mt-4">Close</button>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app" class="hidden max-w-7xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between mb-8">
+      <button onclick="history.back()" class="text-zinc-400 hover:text-white transition">← Back</button>
+      <h1 id="batch-title" class="text-xl font-bold truncate flex-1 text-center">Loading...</h1>
+      <button id="theme-toggle-details" class="p-2 rounded-full hover:bg-white/10 transition"><span id="theme-icon-details">🌙</span></button>
+    </header>
+
+    <div id="hero" class="bg-zinc-800/60 backdrop-blur-lg rounded-2xl p-6 mb-8 flex flex-col md:flex-row gap-6 items-center">
+      <img id="hero-thumbnail" src="" alt="Batch thumbnail" class="w-40 h-40 rounded-xl object-cover shadow-lg" />
+      <div>
+        <h2 id="hero-title" class="text-2xl md:text-3xl font-black mb-2"></h2>
+        <p id="hero-price" class="text-2xl font-bold text-indigo-400"></p>
+      </div>
+    </div>
+
+    <div class="flex gap-2 mb-6">
+      <button class="tab-btn active px-6 py-2.5 rounded-full bg-zinc-800 text-zinc-400 font-semibold hover:bg-zinc-700 transition" data-tab="overview">Overview</button>
+      <button class="tab-btn px-6 py-2.5 rounded-full bg-zinc-800 text-zinc-400 font-semibold hover:bg-zinc-700 transition" data-tab="study-material">Study Material</button>
+    </div>
+
+    <div id="tab-content">
+      <div id="overview-panel" class="tab-panel">
+        <div id="description-container" class="description bg-zinc-800/50 backdrop-blur-md rounded-2xl p-6 prose prose-invert max-w-none"></div>
+      </div>
+      <div id="study-material-panel" class="tab-panel hidden">
+        <div class="flex flex-col lg:flex-row gap-6">
+          <aside class="lg:w-72 bg-zinc-800/60 backdrop-blur-md rounded-2xl p-5 h-fit lg:sticky top-4">
+            <h3 class="text-lg font-semibold mb-4">Subjects</h3>
+            <ul id="subject-list" class="space-y-2"></ul>
+          </aside>
+          <main class="flex-1 bg-zinc-800/60 backdrop-blur-md rounded-2xl p-5 min-h-[400px]">
+            <nav id="breadcrumb" class="flex flex-wrap gap-2 text-sm text-zinc-400 mb-4"></nav>
+            <div id="file-grid" class="space-y-3"></div>
+          </main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== CONFIG ==========
+    const API_BASE = 'https://study-one-api.vercel.app/api';
+    const MEDIA_PROXY = 'https://study-one-access.vercel.app/media';
+    const TELEGRAM_BOT = 'https://t.me/StudyOne_Key_Generator_Bot';
+    const CORS_PROXY = 'https://corsproxy.io/?';  // always use this
+
+    // ========== THEME ==========
+    const themeToggle2 = document.getElementById('theme-toggle-details');
+    const themeIcon2 = document.getElementById('theme-icon-details');
+    function applyTheme(theme) {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+      themeIcon2.textContent = theme === 'dark' ? '🌙' : '☀️';
+      localStorage.setItem('theme', theme);
+    }
+    applyTheme(localStorage.getItem('theme') || 'dark');
+    themeToggle2.addEventListener('click', () => {
+      applyTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark');
+    });
+
+    // ========== ZSTD DECOMPRESSION ==========
+    async function fetchAndDecode(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buffer = await res.arrayBuffer();
+      try {
+        const decoder = new ZstdDec();
+        const decompressed = decoder.decode(new Uint8Array(buffer));
+        const text = new TextDecoder().decode(decompressed);
+        const json = JSON.parse(text);
+        if (!json.success) throw new Error(json.message || 'API returned success: false');
+        return json;
+      } catch (zstdError) {
+        try {
+          const text = new TextDecoder().decode(buffer);
+          const json = JSON.parse(text);
+          if (!json.success) throw new Error(json.message || 'API returned success: false');
+          return json;
+        } catch (plainError) {
+          throw new Error(`Failed to parse API response: ${zstdError.message}`);
+        }
+      }
+    }
+
+    // ========== MEDIA LOADING OVERLAY ==========
+    const mediaOverlay = document.getElementById('media-loading-overlay');
+    const mediaSpinner = document.getElementById('media-spinner');
+    const mediaStatusText = document.getElementById('media-status-text');
+    const mediaErrorText = document.getElementById('media-error-text');
+    const mediaErrorContainer = document.getElementById('media-error-container');
+    const mediaRetryBtn = document.getElementById('media-retry-btn');
+    const mediaCloseBtn = document.getElementById('media-close-btn');
+
+    let lastFileUrl = null;
+
+    function showMediaLoading(message = "Getting Your Media Ready...") {
+      mediaSpinner.classList.remove('hidden');
+      mediaStatusText.textContent = message;
+      mediaStatusText.classList.remove('hidden');
+      mediaErrorContainer.classList.add('hidden');
+      mediaCloseBtn.classList.add('hidden');
+      mediaOverlay.classList.remove('hidden');
+    }
+
+    function showMediaError(message) {
+      mediaSpinner.classList.add('hidden');
+      mediaStatusText.classList.add('hidden');
+      mediaErrorText.textContent = message;
+      mediaErrorContainer.classList.remove('hidden');
+      mediaCloseBtn.classList.remove('hidden');
+    }
+
+    function hideMediaOverlay() {
+      mediaOverlay.classList.add('hidden');
+      lastFileUrl = null;
+    }
+
+    mediaCloseBtn.addEventListener('click', hideMediaOverlay);
+    mediaRetryBtn.addEventListener('click', () => {
+      if (lastFileUrl) playMedia(lastFileUrl);
+    });
+    mediaOverlay.addEventListener('click', (e) => {
+      if (e.target === mediaOverlay) hideMediaOverlay();
+    });
+
+    // ========== MEDIA FLOW (always via CORS proxy) ==========
+    async function getMediaUrl(mediaToken) {
+      const data = await fetchAndDecode(`${API_BASE}/media/${mediaToken}`);
+      if (!data.success || !data.file_url) throw new Error('Invalid media response');
+      return data.file_url;
+    }
+
+    async function playMedia(fileUrl) {
+      showMediaLoading();
+      lastFileUrl = fileUrl;
+      try {
+        // The exact working pattern from your test:
+        const targetUrl = `${MEDIA_PROXY}?url=${encodeURIComponent(fileUrl)}`;
+        const proxyUrl = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error(`Proxy error: ${res.status}`);
+        const data = await res.json();
+        if (data.token) {
+          window.open(`${TELEGRAM_BOT}?start=url_token_${data.token}`, '_blank');
+          hideMediaOverlay();
+        } else {
+          throw new Error('No token in response');
+        }
+      } catch (err) {
+        console.error(err);
+        showMediaError(`Unable to prepare your media: ${err.message}. Please try again.`);
+      }
+    }
+
+    // ========== BATCH LOGIC (unchanged) ==========
+    const loader = document.getElementById('loader');
+    const app = document.getElementById('app');
+    const batchTitleEl = document.getElementById('batch-title');
+    const heroThumb = document.getElementById('hero-thumbnail');
+    const heroTitleEl = document.getElementById('hero-title');
+    const heroPrice = document.getElementById('hero-price');
+    const descContainer = document.getElementById('description-container');
+    const subjectList = document.getElementById('subject-list');
+    const breadcrumb = document.getElementById('breadcrumb');
+    const fileGrid = document.getElementById('file-grid');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const overviewPanel = document.getElementById('overview-panel');
+    const studyPanel = document.getElementById('study-material-panel');
+
+    let currentBatchToken = null;
+    let contentToken = null;
+    let folderStack = [];
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        overviewPanel.classList.toggle('hidden', btn.dataset.tab !== 'overview');
+        studyPanel.classList.toggle('hidden', btn.dataset.tab !== 'study-material');
+      });
+    });
+
+    async function loadCourse(token) {
+      const course = await fetchAndDecode(`${API_BASE}/course/${token}`);
+      currentBatchToken = token;
+      contentToken = course.content_token;
+
+      const overviewSection = course.data?.data?.find(s => s.type === 'overview');
+      if (overviewSection) {
+        const detailsLayout = overviewSection.data?.find(l => l.layout_type === 'details');
+        if (detailsLayout?.layout_data?.[0]) {
+          const info = detailsLayout.layout_data[0];
+          heroThumb.src = info.thumbnail || course.thumbnail || '';
+          heroTitleEl.textContent = info.title || course.title || '';
+          heroPrice.textContent = info.offer_price ? `₹${info.offer_price}` : (info.mrp ? `₹${info.mrp}` : '');
+          batchTitleEl.textContent = info.title || course.title || 'Batch';
+          descContainer.innerHTML = info.description || '<p class="text-zinc-400">No description available.</p>';
+        }
+      } else {
+        heroThumb.src = course.thumbnail || '';
+        heroTitleEl.textContent = course.title || '';
+        heroPrice.textContent = '';
+        batchTitleEl.textContent = course.title || 'Batch';
+        descContainer.innerHTML = '<p class="text-zinc-400">No description available.</p>';
+      }
+
+      if (contentToken) {
+        loadContentTree(contentToken);
+      } else {
+        fileGrid.innerHTML = '<div class="text-center text-zinc-400 py-8">No content token available.</div>';
+        subjectList.innerHTML = '<li class="text-zinc-500 text-sm">No subjects</li>';
+      }
+
+      loader.style.display = 'none';
+      app.classList.remove('hidden');
+    }
+
+    async function loadContentTree(token) {
+      try {
+        const json = await fetchAndDecode(`${API_BASE}/content/${token}`);
+        if (json.data) {
+          renderRootFolders(json.data);
+        }
+      } catch (e) {
+        console.error(e);
+        fileGrid.innerHTML = `<div class="text-center text-red-400 py-8">Failed to load content: ${e.message}</div>`;
+      }
+    }
+
+    function renderRootFolders(folders) {
+      subjectList.innerHTML = '';
+      fileGrid.innerHTML = '';
+      if (!folders || !folders.length) {
+        subjectList.innerHTML = '<li class="text-zinc-500 text-sm">No subjects</li>';
+        return;
+      }
+      folders.forEach(folder => {
+        if (folder.type !== 'folder') return;
+        const li = document.createElement('li');
+        li.className = 'cursor-pointer p-3 rounded-xl bg-zinc-700/40 hover:bg-indigo-500/20 transition font-medium text-zinc-300 hover:text-white';
+        li.textContent = folder.title;
+        li.addEventListener('click', () => {
+          selectSubject(folder.token, folder.title);
+        });
+        subjectList.appendChild(li);
+      });
+    }
+
+    function selectSubject(folderToken, folderTitle) {
+      document.querySelectorAll('#subject-list li').forEach(li => {
+        li.classList.toggle('bg-indigo-500/30', li.textContent === folderTitle);
+        li.classList.toggle('text-white', li.textContent === folderTitle);
+      });
+      folderStack = [{ token: folderToken, title: folderTitle }];
+      loadFolderContents(folderToken);
+      tabBtns.forEach(b => b.classList.remove('active'));
+      document.querySelector('[data-tab="study-material"]').classList.add('active');
+      overviewPanel.classList.add('hidden');
+      studyPanel.classList.remove('hidden');
+    }
+
+    async function loadFolderContents(folderToken) {
+      fileGrid.innerHTML = '<div class="text-center text-zinc-400 py-8">Loading...</div>';
+      try {
+        const json = await fetchAndDecode(`${API_BASE}/content/${folderToken}`);
+        renderItems(json.data, folderToken);
+      } catch (e) {
+        console.error(e);
+        fileGrid.innerHTML = `<div class="text-center text-red-400 py-8">Failed to load folder: ${e.message}. <button onclick="loadFolderContents('${folderToken}')" class="underline text-indigo-400">Retry</button></div>`;
+      }
+    }
+
+    function renderItems(items, parentToken) {
+      fileGrid.innerHTML = '';
+      if (!items || !items.length) {
+        fileGrid.innerHTML = '<div class="text-center text-zinc-500 py-8">Nothing here</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        if (item.type === 'folder') {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'bg-zinc-700/40 rounded-xl overflow-hidden';
+
+          const header = document.createElement('div');
+          header.className = 'folder-header';
+          header.innerHTML = `
+            <img src="images/folder.png" alt="folder" class="folder-icon" />
+            <span class="folder-title">${item.title}</span>
+            <span class="expand-arrow">▶</span>
+          `;
+          
+          const subContainer = document.createElement('div');
+          subContainer.className = 'folder-content';
+
+          wrapper.appendChild(header);
+          wrapper.appendChild(subContainer);
+          fileGrid.appendChild(wrapper);
+
+          header.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const arrow = header.querySelector('.expand-arrow');
+            if (subContainer.classList.contains('open')) {
+              subContainer.classList.remove('open');
+              subContainer.innerHTML = '';
+              arrow.textContent = '▶';
+              return;
+            }
+            subContainer.classList.add('open');
+            arrow.textContent = '▼';
+            subContainer.innerHTML = '<div class="text-center text-zinc-400 py-4">Loading...</div>';
+            try {
+              const json = await fetchAndDecode(`${API_BASE}/content/${item.token}`);
+              const children = json.data || [];
+              const files = children.filter(f => f.type === 'file');
+              const subFolders = children.filter(f => f.type === 'folder');
+              subContainer.innerHTML = '';
+              subFolders.forEach(sub => {
+                const subCard = document.createElement('div');
+                subCard.className = 'bg-zinc-600/40 rounded-lg p-2 flex items-center gap-2 cursor-pointer mb-2';
+                subCard.innerHTML = `<img src="images/folder.png" class="folder-icon" style="width:30px;height:30px;" /> <span class="truncate">${sub.title}</span>`;
+                subCard.addEventListener('click', (e2) => {
+                  e2.stopPropagation();
+                  folderStack.push({ token: sub.token, title: sub.title });
+                  loadFolderContents(sub.token);
+                });
+                subContainer.appendChild(subCard);
+              });
+              files.forEach(file => {
+                const fileCard = document.createElement('div');
+                fileCard.className = 'file-card';
+                const img = document.createElement('img');
+                img.className = 'thumb';
+                img.src = file.thumbnail || '';
+                img.alt = '';
+                img.onerror = () => { img.src = 'data:image/svg+xml,...'; };
+                fileCard.appendChild(img);
+                const info = document.createElement('div');
+                info.className = 'info';
+                info.innerHTML = `
+                  <div class="title">${file.title}</div>
+                  <div class="meta">${file.file_type === 2 ? '🎬 Video' : '📄 PDF'}</div>
+                `;
+                fileCard.appendChild(info);
+                fileCard.addEventListener('click', () => handleFileClick(file));
+                subContainer.appendChild(fileCard);
+              });
+              if (!subFolders.length && !files.length) {
+                subContainer.innerHTML = '<div class="text-zinc-500 text-sm p-2">This folder is empty</div>';
+              }
+              subContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch (err) {
+              subContainer.innerHTML = `<div class="text-red-400 text-sm p-2">Failed to load: ${err.message}. <button class="underline text-indigo-400" onclick="this.parentElement.innerHTML='Loading...'; loadSubFolderContent('${item.token}', this.parentElement)">Retry</button></div>`;
+            }
+          });
+        } else if (item.type === 'file') {
+          const card = document.createElement('div');
+          card.className = 'file-card';
+          const img = document.createElement('img');
+          img.className = 'thumb';
+          img.src = item.thumbnail || '';
+          img.alt = '';
+          img.onerror = () => { img.src = 'data:image/svg+xml,...'; };
+          card.appendChild(img);
+          const info = document.createElement('div');
+          info.className = 'info';
+          info.innerHTML = `
+            <div class="title">${item.title}</div>
+            <div class="meta">${item.file_type === 2 ? '🎬 Video' : '📄 PDF'}</div>
+          `;
+          card.appendChild(info);
+          card.addEventListener('click', () => handleFileClick(item));
+          fileGrid.appendChild(card);
+        }
+      });
+      updateBreadcrumb();
+    }
+
+    window.loadSubFolderContent = async function(token, container) {
+      try {
+        container.innerHTML = '<div class="text-center text-zinc-400 py-4">Loading...</div>';
+        const json = await fetchAndDecode(`${API_BASE}/content/${token}`);
+        const children = json.data || [];
+        const files = children.filter(f => f.type === 'file');
+        const subFolders = children.filter(f => f.type === 'folder');
+        container.innerHTML = '';
+        subFolders.forEach(sub => {
+          const subCard = document.createElement('div');
+          subCard.className = 'bg-zinc-600/40 rounded-lg p-2 flex items-center gap-2 cursor-pointer mb-2';
+          subCard.innerHTML = `<img src="images/folder.png" class="folder-icon" style="width:30px;height:30px;" /> <span class="truncate">${sub.title}</span>`;
+          subCard.addEventListener('click', (e2) => {
+            e2.stopPropagation();
+            folderStack.push({ token: sub.token, title: sub.title });
+            loadFolderContents(sub.token);
+          });
+          container.appendChild(subCard);
+        });
+        files.forEach(file => {
+          const fileCard = document.createElement('div');
+          fileCard.className = 'file-card';
+          const img = document.createElement('img');
+          img.className = 'thumb';
+          img.src = file.thumbnail || '';
+          img.alt = '';
+          img.onerror = () => { img.src = 'data:image/svg+xml,...'; };
+          fileCard.appendChild(img);
+          const info = document.createElement('div');
+          info.className = 'info';
+          info.innerHTML = `
+            <div class="title">${file.title}</div>
+            <div class="meta">${file.file_type === 2 ? '🎬 Video' : '📄 PDF'}</div>
+          `;
+          fileCard.appendChild(info);
+          fileCard.addEventListener('click', () => handleFileClick(file));
+          container.appendChild(fileCard);
+        });
+        if (!subFolders.length && !files.length) {
+          container.innerHTML = '<div class="text-zinc-500 text-sm p-2">This folder is empty</div>';
+        }
+      } catch (err) {
+        container.innerHTML = `<div class="text-red-400 text-sm p-2">Failed to load: ${err.message}. <button class="underline text-indigo-400" onclick="loadSubFolderContent('${token}', this.parentElement)">Retry</button></div>`;
+      }
+    };
+
+    async function handleFileClick(file) {
+      showMediaLoading();
+      try {
+        const fileUrl = await getMediaUrl(file.token);
+        await playMedia(fileUrl);
+      } catch (e) {
+        console.error(e);
+        showMediaError(`Failed to get media: ${e.message}`);
+      }
+    }
+
+    function updateBreadcrumb() {
+      breadcrumb.innerHTML = '';
+      folderStack.forEach((f, i) => {
+        if (i < folderStack.length - 1) {
+          const btn = document.createElement('button');
+          btn.className = 'text-indigo-400 hover:text-indigo-300 transition';
+          btn.textContent = f.title;
+          btn.addEventListener('click', () => {
+            folderStack = folderStack.slice(0, i + 1);
+            loadFolderContents(folderStack[i].token);
+          });
+          breadcrumb.appendChild(btn);
+          breadcrumb.appendChild(document.createTextNode(' / '));
+        } else {
+          const span = document.createElement('span');
+          span.className = 'text-white font-semibold';
+          span.textContent = f.title;
+          breadcrumb.appendChild(span);
+        }
+      });
+    }
+
+    async function loadBatch() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      if (!token) {
+        loader.innerHTML = '<p class="text-red-400">No batch token provided. <a href="index.html" class="underline">Go to list</a></p>';
+        return;
+      }
+      try {
+        await loadCourse(token);
+      } catch (e) {
+        loader.innerHTML = `<p class="text-red-400">Failed to load batch (${e.message}). <button onclick="location.reload()" class="underline">Retry</button></p>`;
+        console.error(e);
+      }
+    }
+
+    loadBatch();
+  </script>
+</body>
+</html>
