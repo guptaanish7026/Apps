@@ -4,7 +4,7 @@
   "communityUrl": "https://t.me/StudyOne",
   "announcement": {
     "enabled": false,
-    "text": "✨ Physics Wallah (PW) under maintenance · Next Toppers fully available · PW free & Next Topper free access on Study One!",
+    "text": "✨ Next Topper All Batches Unlocked. Pw Under Maintenance.",
     "backgroundColor": "#eef2ff",
     "textColor": "#1e40af",
     "speed": 20
@@ -19,7 +19,7 @@
       "name": "Next Toppers",
       "description": "Premium JEE/NEET courses — Next Topper free, Next Topper mod, all batches unlocked. High-quality video lectures on Study One.",
       "icon": "images/logo_1.png",
-      "url": "https://nt.example.com",
+      "url": "https://study-one-pi.vercel.app/NT2026",
       "maintenance": false,
       "show": true,
       "badgeText": "Live · Free access"
@@ -30,7 +30,7 @@
       "icon": "images/logo_2.png",
       "url": "https://pw.example.com",
       "maintenance": false,
-      "show": true,
+      "show": false,
       "badgeText": "Maintenance"
     },
     {
