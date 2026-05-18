@@ -1,0 +1,55 @@
+{
+  "siteName": "Study One",
+  "siteLogo": "images/S1.png",
+  "communityUrl": "https://t.me/StudyOne",
+  "announcement": {
+    "enabled": false,
+    "text": "✨ Physics Wallah (PW) under maintenance · Next Toppers fully available · PW free & Next Topper free access on Study One!",
+    "backgroundColor": "#eef2ff",
+    "textColor": "#1e40af",
+    "speed": 20
+  },
+  "downloadApk": {
+    "enabled": false,
+    "url": "https://example.com/app.apk",
+    "text": "📱 Download APK"
+  },
+  "apps": [
+    {
+      "name": "Next Toppers",
+      "description": "Premium JEE/NEET courses — Next Topper free, Next Topper mod, all batches unlocked. High-quality video lectures on Study One.",
+      "icon": "images/logo_1.png",
+      "url": "https://nt.example.com",
+      "maintenance": false,
+      "show": true,
+      "badgeText": "Live · Free access"
+    },
+    {
+      "name": "Physics Wallah",
+      "description": "India's most loved ed-tech. PW free, PW mod, PW all batches free — IIT JEE, NEET, and board prep by PW's star educators. Only on Study One.",
+      "icon": "images/logo_2.png",
+      "url": "https://pw.example.com",
+      "maintenance": false,
+      "show": true,
+      "badgeText": "Maintenance"
+    },
+    {
+      "name": "App Three (hidden)",
+      "description": "Future app — not shown yet.",
+      "icon": "images/logo_3.png",
+      "url": "#",
+      "maintenance": false,
+      "show": false,
+      "badgeText": "Coming soon"
+    },
+    {
+      "name": "App Four (hidden)",
+      "description": "Another future app.",
+      "icon": "images/logo_4.png",
+      "url": "#",
+      "maintenance": true,
+      "show": false,
+      "badgeText": "Planned"
+    }
+  ]
+}
