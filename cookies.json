@@ -1,0 +1,17 @@
+[
+    {
+        "name": "auth_token",
+        "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtb2JpbGUiOiI3MDA0Nzk1MzI2IiwibmFtZSI6IlNhaGViIEt1bWFyIiwiaWF0IjoxNzc5NDY4NDUwLCJleHAiOjE3ODcyNDQ0NTB9.tc5E4ptMtBP_sRfgY0AEEv45adbf5SEnZTb7kWboZoQ",
+        "domain": "pwthor.live",
+        "hostOnly": true,
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "no_restriction",
+        "session": false,
+        "firstPartyDomain": "",
+        "partitionKey": null,
+        "expirationDate": 1787244450.61,
+        "storeId": null
+    }
+]
